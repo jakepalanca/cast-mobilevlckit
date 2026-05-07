@@ -1,0 +1,12 @@
+# Pins the upstream VLCKit commit that
+# scripts/build-mobilevlckit-with-livehttp.sh was authored and tested
+# against. The build script clones with --depth=1 --branch=3.0, which
+# by default tracks the current tip of the 3.0 branch — for bit-for-bit
+# reproducibility of the binary embedded in a given Cast.app release,
+# check out this exact SHA before running the script.
+
+repository = https://code.videolan.org/videolan/VLCKit.git
+branch     = 3.0
+commit     = 319ed2c0724e3d4c4d34889a62fef1ae269491bc
+commit_msg = libvlc: add patch to prevent crashes on NULL MRLs
+pinned_at  = 2026-05-07

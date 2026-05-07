@@ -1,0 +1,5 @@
+.DS_Store
+.build/
+vendor/
+*.bak
+*.bak[0-9]
