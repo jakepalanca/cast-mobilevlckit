@@ -29,8 +29,12 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD_ROOT="${REPO_ROOT}/.build/vlckit"
-OUT_DIR="${REPO_ROOT}/vendor/MobileVLCKit"
+# Consumers (Cast.app via a submodule wrapper) can redirect both the
+# scratch dir and the install dir away from this repo by exporting
+# CAST_BUILD_ROOT / CAST_OUT_DIR. Defaults reproduce the original
+# stand-alone behaviour: artefacts land inside this checkout.
+BUILD_ROOT="${CAST_BUILD_ROOT:-${REPO_ROOT}/.build/vlckit}"
+OUT_DIR="${CAST_OUT_DIR:-${REPO_ROOT}/vendor/MobileVLCKit}"
 VLCKIT_BRANCH="${VLCKIT_BRANCH:-3.0}"
 ARCH_FLAG="${ARCH_FLAG:--a aarch64}"
 EXTRA_FLAGS="${EXTRA_FLAGS:--v -f}"
