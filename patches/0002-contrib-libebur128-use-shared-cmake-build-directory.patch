@@ -1,0 +1,24 @@
+From: Cast contributors <cast@local.invalid>
+Subject: [PATCH] contrib: migrate libebur128 to shared CMake build helpers
+
+The shared CMAKE macro already passes -S $< and -B $</_build. Running it
+after cd $< duplicates the source path, so a clean/incremental build stops
+before libvlc compilation. Match the existing png/chromaprint recipes and
+run configure, build and install from the contrib directory.
+
+--- a/contrib/src/libebur128/rules.mak
++++ b/contrib/src/libebur128/rules.mak
+@@ -18,8 +18,11 @@ libebur128: libebur128-$(LIBEBUR128_VERSION).tar.gz .sum-libebur128
+ 	$(call pkg_static,"./ebur128/libebur128.pc.cmake")
+ 	$(MOVE)
+ 
++# Cast modification, 2026-09-09: CMAKE owns the source/build directory paths.
+ .libebur128: libebur128 toolchain.cmake
+-	cd $< && $(HOSTVARS_PIC) $(CMAKE)
+-	cd $< && $(MAKE) install
++	$(CMAKECLEAN)
++	$(HOSTVARS_PIC) $(CMAKE)
++	+$(CMAKEBUILD)
++	$(CMAKEINSTALL)
+ 	rm -f $(PREFIX)/lib/libebur128.so*
+ 	touch $@

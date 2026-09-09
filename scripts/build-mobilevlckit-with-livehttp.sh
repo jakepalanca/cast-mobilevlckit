@@ -164,6 +164,39 @@ path.write_text(text)
 PY
 fi
 
+# Apply the core patches after upstream has cloned/reset/patched libvlc,
+# before either architecture compiles. This also runs with -n, which skips
+# network/source-reset steps for an incremental build. Forward and reverse
+# checks make repeated runs safe and fail clearly if upstream has diverged.
+export CAST_LIBVLC_PATCH_DIR="${REPO_ROOT}/patches"
+if ! grep -q '# CAST_CORE_PATCHES' "${BMVK}"; then
+  echo "[build-mvk] Installing post-source-setup libvlc patch hook"
+  python3 - "${BMVK}" <<'PY'
+import sys, pathlib
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+anchor = 'spopd\n\n#\n# Build time\n#\n'
+if text.count(anchor) != 1:
+    sys.exit('ERROR: libvlc patch hook anchor missing or ambiguous')
+hook = '''spopd
+
+# CAST_CORE_PATCHES: keep the canonical source fixes in both slices.
+for cast_core_patch in "${CAST_LIBVLC_PATCH_DIR:?Canonical patch directory is required}"/*.patch; do
+    if git -C "${VLCROOT}" apply --reverse --check "${cast_core_patch}" >/dev/null 2>&1; then
+        continue
+    fi
+    git -C "${VLCROOT}" apply --check "${cast_core_patch}"
+    git -C "${VLCROOT}" apply "${cast_core_patch}"
+done
+
+#
+# Build time
+#
+'''
+path.write_text(text.replace(anchor, hook, 1))
+PY
+fi
+
 # Wipe stale config.h so configure re-runs with the new override, and
 # nuke any existing filesystem.lo caches so make re-compiles with
 # HAVE_PIPE2 undefined.
@@ -289,8 +322,8 @@ Pod::Spec.new do |s|
     Stock CocoaPods pod strips `access_output_livehttp`, which libvlc
     needs for its HLS segmenter. This fork is produced by
     scripts/build-mobilevlckit-with-livehttp.sh in the Cast app repo and
-    re-enables that module (plus --enable-sout). Everything else matches
-    upstream VideoLAN 3.0 branch.
+    re-enables that module (plus --enable-sout), with the documented
+    presentation-only stream-output timestamp correction.
   DESC
   s.homepage     = 'https://code.videolan.org/videolan/VLCKit'
   s.license      = { :type => 'LGPL-2.1+' }

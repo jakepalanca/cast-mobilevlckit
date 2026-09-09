@@ -7,11 +7,13 @@ This repository exists to satisfy GNU LGPL-2.1 §4 + §6 ("provide the source / 
 - The exact build script Cast.app's vendored `MobileVLCKit.xcframework` was produced from — `scripts/build-mobilevlckit-with-livehttp.sh`
 - A pin of the upstream `videolan/VLCKit` commit the script was applied to — `UPSTREAM.lock`
 - A human-readable description of every patch — `PATCHES.md`
+- The stream-output timestamp correction — `patches/0001-sout-convert-presentation-only-timestamps.patch`
+- The libebur128 CMake recipe correction — `patches/0002-contrib-libebur128-use-shared-cmake-build-directory.patch`
 - The full text of the GNU Lesser General Public License version 2.1 — `LICENSE`
 
 ## What was changed
 
-The stock CocoaPods `MobileVLCKit` pod is built with `access_output_livehttp` (libvlc's HLS segmenter) stripped from the iOS plugin list. Cast.app needs that module to repackage arbitrary input streams as HLS for AirPlay receivers, which only accept HLS. Our build script removes the strip, passes `--enable-sout` to libvlc's `configure`, and applies a small set of build-time fixes for iOS SDK 26 on Apple Silicon. Every modification is an idempotent `sed`/`python` edit against `buildMobileVLCKit.sh`. See `PATCHES.md` for the full list.
+The stock CocoaPods `MobileVLCKit` pod is built with `access_output_livehttp` (libvlc's HLS segmenter) stripped from the iOS plugin list. Cast.app uses that module to serve converted HLS to receivers. Our build script restores it, enables stream output, and applies build fixes for iOS on Apple Silicon. A narrow libvlc source patch also converts presentation-only timestamps before stream output, fixing FLV clock discontinuities. See `PATCHES.md` for the full list and source provenance.
 
 **No license-incompatible code is enabled.** The build does not pull in `x264`, `x265`, `faac`, `fdk-aac`, or any `--enable-gpl` / `--enable-nonfree` flag. The resulting binary remains LGPL-2.1-or-later, identical in license terms to upstream VLCKit.
 
@@ -30,7 +32,7 @@ cd cast-mobilevlckit
 bash scripts/build-mobilevlckit-with-livehttp.sh
 ```
 
-The script clones `videolan/VLCKit` at the commit pinned in `UPSTREAM.lock`, applies the patches described in `PATCHES.md`, runs the upstream `buildMobileVLCKit.sh`, and verifies the `vlc_entry__access_output_lib*livehttp*` symbol is present in each slice of the resulting xcframework.
+The script clones the configured `videolan/VLCKit` branch when no checkout exists, applies the patches described in `PATCHES.md`, runs the upstream `buildMobileVLCKit.sh`, and verifies the `vlc_entry__access_output_lib*livehttp*` symbol in each resulting slice. For the recorded build, use the revision in `UPSTREAM.lock`; the script does not automatically check out that revision. `PATCHES.md` includes the incremental command for the verified cached checkout.
 
 Output: `vendor/MobileVLCKit/MobileVLCKit.xcframework` containing `ios-arm64` and `ios-arm64-simulator` slices.
 

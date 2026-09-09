@@ -1,0 +1,36 @@
+From: Cast contributors <cast@local.invalid>
+Subject: [PATCH] input: convert presentation-only timestamps before stream output
+
+An FLV can begin with video DTS before the container's start time. The
+avformat demuxer then supplies invalid/nonpositive DTS but valid PTS.
+DecoderFixTs only converts timestamps when its primary timestamp is valid.
+Passing DTS as primary left the first PTS in stream time while subsequent
+packets used system time. The TS muxer's DTS=PTS fallback exposed this as
+a large discontinuity, corrupting HLS duration and HTTP relay startup.
+
+Convert a valid PTS independently in that case. Keep DTS invalid for the
+existing downstream fallback and preserve both the valid-DTS path and the
+both-invalid path. Do not invent, clamp, or shift source timestamps.
+
+--- a/src/input/decoder.c
++++ b/src/input/decoder.c
+@@ -846,8 +846,17 @@ static int DecoderPlaySout( decoder_t *p_dec, block_t *p_sout_block )
+     }
+ 
+     DecoderWaitUnblock( p_dec );
+-    DecoderFixTs( p_dec, &p_sout_block->i_dts, &p_sout_block->i_pts,
+-                  &p_sout_block->i_length, NULL, INT64_MAX );
++    if( p_sout_block->i_dts <= VLC_TICK_INVALID &&
++        p_sout_block->i_pts > VLC_TICK_INVALID )
++    {
++        /* Cast modification, 2026-09-09: keep presentation-only packets on
++         * the system clock. Muxers may derive DTS from the converted PTS. */
++        DecoderFixTs( p_dec, &p_sout_block->i_pts, NULL,
++                      &p_sout_block->i_length, NULL, INT64_MAX );
++    }
++    else
++        DecoderFixTs( p_dec, &p_sout_block->i_dts, &p_sout_block->i_pts,
++                      &p_sout_block->i_length, NULL, INT64_MAX );
+ 
+     vlc_mutex_unlock( &p_owner->lock );
+ 
