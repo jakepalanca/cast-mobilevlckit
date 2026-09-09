@@ -197,6 +197,40 @@ path.write_text(text.replace(anchor, hook, 1))
 PY
 fi
 
+# The contrib Makefile regenerates its compiler/SDK variables on every run,
+# but toolchain.cmake has no prerequisites and survives Xcode switches.
+# Invalidate only generated CMake configuration when its compiler or SDK
+# differs from the environment selected for this architecture. Keep source,
+# installed libraries, and unchanged-toolchain incremental caches intact.
+if ! grep -q '# CAST_CMAKE_TOOLCHAIN_REFRESH' "${BMVK}"; then
+  echo "[build-mvk] Installing per-architecture CMake toolchain refresh"
+  python3 - "${BMVK}" <<'PY'
+import sys, pathlib
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+anchor = '    make fetch -j$MAKE_JOBS\n'
+if text.count(anchor) != 1:
+    sys.exit('ERROR: contrib toolchain refresh anchor missing or ambiguous')
+hook = '''    # CAST_CMAKE_TOOLCHAIN_REFRESH
+    if [ -f toolchain.cmake ] && {
+        ! grep -Fqx -- "set(CMAKE_C_COMPILER ${CC})" toolchain.cmake ||
+        ! grep -Fqx -- "set(CMAKE_CXX_COMPILER ${CXX})" toolchain.cmake ||
+        ! grep -Fqx -- "set(CMAKE_OSX_SYSROOT ${SDKROOT})" toolchain.cmake;
+    }; then
+        info "Refreshing cached CMake configuration for ${OSSTYLE}${PLATFORM} ${ARCH}"
+        rm -f toolchain.cmake
+        for cast_cmake_build in */_build; do
+            [ -d "${cast_cmake_build}" ] || continue
+            rm -f "${cast_cmake_build}/CMakeCache.txt"
+            rm -rf "${cast_cmake_build}/CMakeFiles"
+        done
+    fi
+    make fetch -j$MAKE_JOBS
+'''
+path.write_text(text.replace(anchor, hook, 1))
+PY
+fi
+
 # Wipe stale config.h so configure re-runs with the new override, and
 # nuke any existing filesystem.lo caches so make re-compiles with
 # HAVE_PIPE2 undefined.

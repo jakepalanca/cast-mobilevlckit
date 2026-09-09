@@ -54,6 +54,12 @@ Both `ios-arm64` and `ios-arm64-simulator` slices are rebuilt. Do not add `-l`, 
 
 `patches/0002-contrib-libebur128-use-shared-cmake-build-directory.patch` updates only the libebur128 contrib recipe. The shared `CMAKE` macro already provides `-S libebur128 -B libebur128/_build`. The old recipe first changed into `libebur128`, incorrectly producing a doubled source path and stopping the framework rebuild. The correction uses the same configure/build/install helpers as adjacent contrib recipes; it preserves the dependency, static build configuration, and functionality.
 
+## 9. Refresh generated CMake configuration after switching Xcode
+
+The contrib `toolchain.cmake` target has no prerequisites. Regenerating `Makefile` and `config.mak` with the selected Xcode therefore leaves absolute compiler and SDK paths from the prior installation in that file. This blocked the Xcode 27 beta rebuild with a nonexistent Xcode 26.4 compiler path.
+
+The build-script hook checks C/C++ compiler and SDK paths after each architecture's configuration is generated. On a mismatch, it removes only `toolchain.cmake` and generated CMake configuration under the dependency `_build` directories, allowing the existing rules to regenerate them. Matching caches, installed libraries, and dependency sources remain intact. The same hook covers device and simulator builds and respects the toolchain selected by the build environment.
+
 ## License of these patches
 
 LGPL-2.1-or-later, matching upstream VLCKit. None of the patches enable a GPL-only encoder or library. The modified C block includes a dated modification notice; the complete patch and build hook are retained here alongside the build-script edits.
