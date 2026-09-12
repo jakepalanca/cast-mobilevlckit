@@ -54,11 +54,17 @@ Both `ios-arm64` and `ios-arm64-simulator` slices are rebuilt. Do not add `-l`, 
 
 `patches/0002-contrib-libebur128-use-shared-cmake-build-directory.patch` updates only the libebur128 contrib recipe. The shared `CMAKE` macro already provides `-S libebur128 -B libebur128/_build`. The old recipe first changed into `libebur128`, incorrectly producing a doubled source path and stopping the framework rebuild. The correction uses the same configure/build/install helpers as adjacent contrib recipes; it preserves the dependency, static build configuration, and functionality.
 
-## 9. Refresh generated CMake configuration after switching Xcode
+## 9. Refresh generated CMake and Meson configuration after switching Xcode
 
 The contrib `toolchain.cmake` target has no prerequisites. Regenerating `Makefile` and `config.mak` with the selected Xcode therefore leaves absolute compiler and SDK paths from the prior installation in that file. This blocked the Xcode 27 beta rebuild with a nonexistent Xcode 26.4 compiler path.
 
 The build-script hook checks C/C++ compiler and SDK paths after each architecture's configuration is generated. On a mismatch, it removes only `toolchain.cmake` and generated CMake configuration under the dependency `_build` directories, allowing the existing rules to regenerate them. Matching caches, installed libraries, and dependency sources remain intact. The same hook covers device and simulator builds and respects the toolchain selected by the build environment.
+
+Meson's generated `crossfile.meson` has the same issue: its prerequisite is the generator script, not the selected compiler. A companion hook compares C/C++ compiler, archiver, and strip paths and removes only a mismatching cross-file. Existing Meson recipes already clear their build directory before configuring. Its separate marker upgrades cached build scripts that already contain the CMake correction.
+
+## 10. Refresh core configuration when its generated header is missing
+
+The upstream core configure condition referenced `THIS_SCRIPT_PATH`, which was never assigned. Deleting `config.h` alone therefore did not force configuration; `make` could replay the old `config.status --recheck` with a removed Xcode installation's compiler path. The corrected condition also checks for a missing `config.h` and uses the actual build-script path for its modification-time check. This makes the existing header invalidation run configure with the active compiler/SDK before compilation. Dependency caches are unaffected.
 
 ## License of these patches
 

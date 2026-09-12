@@ -231,9 +231,56 @@ path.write_text(text.replace(anchor, hook, 1))
 PY
 fi
 
+# Meson has a separate generated compiler cross-file. Its only prerequisite
+# is the generator script, so Xcode switches also leave this file stale.
+# Use a separate marker to upgrade cached builds that already have the
+# CMake refresh hook. Meson recipes clear their own build configuration.
+if ! grep -q '# CAST_MESON_TOOLCHAIN_REFRESH' "${BMVK}"; then
+  echo "[build-mvk] Installing per-architecture Meson toolchain refresh"
+  python3 - "${BMVK}" <<'PY'
+import sys, pathlib
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+anchor = '    make fetch -j$MAKE_JOBS\n'
+if text.count(anchor) != 1:
+    sys.exit('ERROR: contrib Meson refresh anchor missing or ambiguous')
+hook = '''    # CAST_MESON_TOOLCHAIN_REFRESH
+    if [ -f crossfile.meson ] && {
+        ! grep -Fqx -- "c = '${CC}'" crossfile.meson ||
+        ! grep -Fqx -- "cpp = '${CXX}'" crossfile.meson ||
+        ! grep -Fqx -- "ar = '${AR}'" crossfile.meson ||
+        ! grep -Fqx -- "strip = '${STRIP}'" crossfile.meson;
+    }; then
+        info "Refreshing cached Meson toolchain for ${OSSTYLE}${PLATFORM} ${ARCH}"
+        rm -f crossfile.meson
+    fi
+    make fetch -j$MAKE_JOBS
+'''
+path.write_text(text.replace(anchor, hook, 1))
+PY
+fi
+
 # Wipe stale config.h so configure re-runs with the new override, and
 # nuke any existing filesystem.lo caches so make re-compiles with
 # HAVE_PIPE2 undefined.
+if ! grep -q '# CAST_CORE_CONFIGURE_REFRESH' "${BMVK}"; then
+  echo "[build-mvk] Correcting the core configure refresh condition"
+  python3 - "${BMVK}" <<'PY'
+import sys, pathlib
+path = pathlib.Path(sys.argv[1])
+text = path.read_text()
+old = '    if [ "${VLCROOT}/configure" -nt config.log -o \\\n         "${THIS_SCRIPT_PATH}" -nt config.log ]; then\n'
+new = '''    # CAST_CORE_CONFIGURE_REFRESH: THIS_SCRIPT_PATH was never defined.
+    # The canonical wrapper removes config.h to require current configuration.
+    if [ ! -f config.h -o "${VLCROOT}/configure" -nt config.log -o \\
+         "${ROOT_DIR}/buildMobileVLCKit.sh" -nt config.log ]; then
+'''
+if text.count(old) != 1:
+    sys.exit('ERROR: core configure condition missing or ambiguous')
+path.write_text(text.replace(old, new, 1))
+PY
+fi
+
 find "${BUILD_ROOT}/VLCKit/libvlc/vlc/build-"* -name config.h -delete 2>/dev/null || true
 find "${BUILD_ROOT}/VLCKit/libvlc/vlc/build-"* -name "filesystem.lo" -delete 2>/dev/null || true
 find "${BUILD_ROOT}/VLCKit/libvlc/vlc/build-"* -name "filesystem.o" -delete 2>/dev/null || true
