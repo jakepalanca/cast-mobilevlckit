@@ -1,0 +1,16 @@
+From: Cast contributors <cast@local.invalid>
+Subject: [PATCH] dav1d: retain source frame rate for stream output
+
+--- a/modules/codec/dav1d.c
++++ b/modules/codec/dav1d.c
+@@ -394,6 +394,10 @@
+ 
+     dec->fmt_out.video.i_width = dec->fmt_in.video.i_width;
+     dec->fmt_out.video.i_height = dec->fmt_in.video.i_height;
++    /* Cast modification, 2026-09-13: retain container timing for stream output.
++     * Without it, the transcoder defaults to 25 fps and drops valid AV1 frames. */
++    dec->fmt_out.video.i_frame_rate = dec->fmt_in.video.i_frame_rate;
++    dec->fmt_out.video.i_frame_rate_base = dec->fmt_in.video.i_frame_rate_base;
+     dec->fmt_out.i_codec = VLC_CODEC_I420;
+     dec->p_sys = p_sys;
+ 

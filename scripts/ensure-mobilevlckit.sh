@@ -76,6 +76,9 @@ elif ! slice_has_livehttp "${DEVICE_SLICE}"; then
 elif ! slice_has_livehttp "${SIM_SLICE}"; then
   need_build=1
   need_reason="simulator slice is missing ${LIVEHTTP_SYMBOL} (looks like the stock pod)"
+elif ! python3 "${REPO_ROOT}/scripts/build-provenance.py" "${OUT_DIR}"; then
+  need_build=1
+  need_reason="framework provenance is missing or stale; source fixes must be compiled into both slices"
 fi
 
 if [[ "${need_build}" -eq 0 ]]; then

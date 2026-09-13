@@ -88,6 +88,11 @@ fi
 # buildMobileVLCKit.sh already forces other iOS-only symbols is the
 # standard autoconf override path. Idempotent.
 BMVK="${BUILD_ROOT}/VLCKit/buildMobileVLCKit.sh"
+# Xcode 27 cannot archive the upstream iOS 9 framework target. Cast targets
+# iOS 26+, so use the modern toolchain's supported floor for both slices.
+if grep -q '^SDK_MIN=9.0$' "${BMVK}"; then
+  sed -i.cast-sdk-min 's/^SDK_MIN=9.0$/SDK_MIN=15.0/' "${BMVK}"
+fi
 if ! grep -q 'ac_cv_func_pipe2=no' "${BMVK}"; then
   echo "[build-mvk] Injecting ac_cv_func_pipe2=no override into buildMobileVLCKit.sh"
   python3 - "${BMVK}" <<'PY'
@@ -393,6 +398,7 @@ done
 echo "[build-mvk] Copying xcframework to ${OUT_DIR}"
 rm -rf "${OUT_DIR}/MobileVLCKit.xcframework"
 cp -R "${PRODUCT}" "${OUT_DIR}/MobileVLCKit.xcframework"
+python3 "${REPO_ROOT}/scripts/build-provenance.py" "${OUT_DIR}" --record
 
 cat > "${OUT_DIR}/MobileVLCKit.podspec" <<'EOF'
 Pod::Spec.new do |s|

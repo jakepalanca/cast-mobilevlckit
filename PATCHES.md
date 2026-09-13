@@ -66,6 +66,18 @@ Meson's generated `crossfile.meson` has the same issue: its prerequisite is the 
 
 The upstream core configure condition referenced `THIS_SCRIPT_PATH`, which was never assigned. Deleting `config.h` alone therefore did not force configuration; `make` could replay the old `config.status --recheck` with a removed Xcode installation's compiler path. The corrected condition also checks for a missing `config.h` and uses the actual build-script path for its modification-time check. This makes the existing header invalidation run configure with the active compiler/SDK before compilation. Dependency caches are unaffected.
 
+## 11. Preserve AV1 container frame rate in the dav1d decoder
+
+`patches/0003-dav1d-preserve-source-frame-rate.patch` copies the input frame-rate numerator and denominator into the decoder's output format. The decoder already preserved dimensions, aspect ratio, and color information, but dropped timing. A 30 fps AV1 Matroska source consequently reached the transcoder with a zero frame rate, triggered its 25 fps fallback, and produced repeated-frame timestamp warnings. This change preserves container timing for all dav1d inputs; it contains no receiver-specific behavior.
+
+## 12. Build against a deployment target supported by current Xcode
+
+The wrapper replaces upstream's iOS 9 minimum with iOS 15. Current Xcode rejects the old minimum while linking the static framework. Cast itself still controls its higher app deployment target.
+
+## 13. Verify the installed binary matches the patches
+
+`scripts/build-provenance.py` records SHA-256 hashes of the upstream lock, build recipe, source patches, and both installed framework binaries after a successful build. `ensure-mobilevlckit.sh` checks that record before reusing a framework. Missing records, changed patches, or replaced binaries require a rebuild. Checking only for the livehttp symbol previously allowed an old framework to pass even when new codec and timestamp patches existed only in the source checkout.
+
 ## License of these patches
 
 LGPL-2.1-or-later, matching upstream VLCKit. None of the patches enable a GPL-only encoder or library. The modified C block includes a dated modification notice; the complete patch and build hook are retained here alongside the build-script edits.
